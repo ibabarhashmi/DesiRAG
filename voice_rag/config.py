@@ -13,6 +13,29 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv(preferred: Path, fallback: Path | None = None) -> None:
+    """Untreated KEY=VALUE loader for a plain .env (no deps).
+
+    Never overrides variables already present in the environment, so exported
+    vars and CI secrets win. Both the repo-local ``voice_rag/.env`` and the
+    project-root ``.env`` (existing local setup) are consulted.
+    """
+    for p in (preferred, fallback):
+        if p is None or not p.exists():
+            continue
+        for raw in p.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
+
+
+_load_dotenv(ROOT / ".env", ROOT.parent / ".env")
+
+
 def _env(*names: str, default: str | None = None) -> str | None:
     for n in names:
         v = os.getenv(n)
