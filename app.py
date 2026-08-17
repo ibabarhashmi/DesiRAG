@@ -93,8 +93,10 @@ def main():
         run = st.button("Answer", type="primary", use_container_width=True)
         st.divider()
         llm_on = os.getenv("VRAG_LLM", "0") == "1"
-        st.caption(f"STT provider: `sarvam` "
-                   f"{'(key set)' if s.sarvam_api_key else '(no key — audio paths disabled)'} "
+        stt_chain = s.stt_fallbacks or []
+        chain_label = " → ".join([s.stt_provider] + stt_chain)
+        st.caption(f"STT chain: `{chain_label}` "
+                   f"({'(Sarvam key set)' if s.sarvam_api_key else '(no key — vosk fallback active)'}) "
                    f"· fluent-LLM rung: {'on' if llm_on else 'off'}")
 
     if not INDEX_DIR.exists():
@@ -107,10 +109,6 @@ def main():
             if query_text:
                 res = pipe.run_from_text(query_text)
             elif audio:
-                if not s.sarvam_api_key:
-                    st.error("SARVAM_API_KEY not set — add it to .env or use "
-                             "the 'Type a question' path.")
-                    st.stop()
                 res = pipe.run_from_audio(audio, ctype)
             else:
                 st.info("Record/upload audio or type a question first.")

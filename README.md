@@ -38,8 +38,29 @@ python scripts/evaluate.py
 streamlit run app.py
 ```
 
-Optional audio pipeline: set `SARVAM_API_KEY` in `.env` (it is read at runtime;
-the STT path retries transient network errors but refuses on auth errors).
+Optional audio pipeline: STT runs through a **fallback chain**
+(`sarvam → faster-whisper → vosk`), so the demo works with *no key at all*:
+
+- **sarvam** (primary when `SARVAM_API_KEY` is set) — best Indic accuracy, free tier.
+- **faster-whisper** (default fallback, offline, ~75–145 MB model) — transcribed a
+  real clip to `"Where is the Taj Mahal located?"` in our live test; model
+  auto-downloads on first use.
+- **vosk** (opt-in, offline, ~40 MB) — lighter but **Linux/Windows only** (no macOS
+  arm64 wheel); use `VRAG_STT_FALLBACKS=vosk`.
+
+Chain order is config (`VRAG_STT_FALLBACKS`); the engine that served a clip and
+the failures before it are reported on `RAGResult.meta` (`stt_provider`,
+`stt_errors`). Inputs are normalized to 16 kHz mono (WAV via stdlib + NumPy;
+mp3/m4a/ogg via ffmpeg when present).
+
+> Language boundary, set deliberately: the knowledge base is **Hindi**, and the
+> off-topic gate needs **lexical coverage** of the query in the retrieved text.
+> Latin-script (English) queries cannot lexically overlap Devanagari passages,
+> and English similarity score *cannot* separate on/off-topic (we measured
+> 0.80–0.86 for both "who built the taj mahal" and "best pizza places in
+> california"), so English queries are refused unless their terms appear in the
+> transcript of a Hindi answer. Hindi-first by design; cross-lingual answering
+> would need the dataset's parallel English passages indexed.
 
 Optional fluent answers: the LLM rung reuses an OpenAI-compatible proxy via the
 same env vars as any sibling project (`LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`,

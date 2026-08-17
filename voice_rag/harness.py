@@ -26,7 +26,8 @@ from .config import Settings, get_settings
 from .embed import Embedder, default_embedder
 from .generate import LLMGenerator, Extracted, extractive_answer
 from .index import ChunkStore
-from .stt import STTError, STTProvider, SarvamSTT
+from .errors import STTError
+from .stt import STTProvider, make_stt_provider
 from .text import tokenize
 
 
@@ -115,11 +116,20 @@ class RAGPipeline:
         try:
             transcript = self._transcribe_with_retry(audio, content_type)
         except STTError as e:
+            meta = {"stt_provider": getattr(self.stt, "last_provider", None)}
+            if getattr(self.stt, "attempts", None):
+                meta["stt_errors"] = list(self.stt.attempts)
             return RAGResult(Status.ERROR, blocked_reason=e.message,
                              language=self.settings.lang,
                              stage_ms={"stt_ms": round(
-                                 (time.perf_counter() - t0) * 1000, 2)})
-        return self._finish(self.run_from_text(transcript),
+                                 (time.perf_counter() - t0) * 1000, 2)},
+                             meta=meta)
+        meta = {"stt_provider": getattr(self.stt, "last_provider", None)}
+        if getattr(self.stt, "attempts", None):
+            meta["stt_errors"] = list(self.stt.attempts)
+        res = self.run_from_text(transcript)
+        res.meta = {**res.meta, **meta}
+        return self._finish(res,
                             {"stt_ms": (time.perf_counter() - t0) * 1000},
                             transcript)
 
@@ -257,9 +267,7 @@ class RAGPipeline:
 
 
 def _make_stt(settings: Settings) -> STTProvider | None:
-    if settings.stt_provider == "sarvam":
-        return SarvamSTT(settings)
-    return None
+    return make_stt_provider(settings)
 
 
 def pipeline_from_artifacts(index_dir: Path | str,

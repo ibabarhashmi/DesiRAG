@@ -128,6 +128,21 @@ class Settings:
         "SARVAM_STT_MODEL", "saarika:v2.5"))
     stt_language: str = field(default_factory=lambda: os.getenv(
         "VRAG_STT_LANG", "hi-IN"))
+    # Free fallback chain when Sarvam is absent/rate-limited/down.
+    # "faster-whisper" (offline CTranslate2 Whisper, ~75–145 MB, no key) is the
+    # default and installs on macOS/arm64 + Linux. "vosk" is a lighter offline
+    # Kaldi fallback available on Linux/Windows (no macOS arm64 wheel on PyPI).
+    # Order = priority after the primary provider.
+    stt_fallbacks: list[str] = field(default_factory=lambda: [
+        x.strip() for x in os.getenv("VRAG_STT_FALLBACKS",
+                                     "faster-whisper").split(",")
+        if x.strip()])
+    vosk_model_dir: Path = field(default_factory=lambda: Path(
+        os.getenv("VRAG_VOSK_MODEL_DIR", ROOT / "data" / "models" / "vosk")))
+    vosk_model_id: str = field(default_factory=lambda: os.getenv(
+        "VRAG_VOSK_MODEL", "vosk-model-small-hi-0.22"))
+    fw_model: str = field(default_factory=lambda: os.getenv(
+        "VRAG_FW_MODEL", "base"))
 
     llm_base_url: str | None = field(default_factory=lambda: _env(
         "LLM_BASE_URL", "ANTHROPIC_BASE_URL"))
